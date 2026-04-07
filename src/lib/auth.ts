@@ -1,7 +1,11 @@
-import NextAuth from 'next-auth'
+import NextAuth, { type User } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+
+interface ExtendedUser extends User {
+  role: string
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
@@ -36,7 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role,
-        }
+        } as ExtendedUser
       },
     }),
   ],
@@ -44,14 +48,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.role = (user as any).role
+        token.role = (user as ExtendedUser).role
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
+        if (session.user) { session.user.id = token.id as string
+        session.user.role = token.role as string }
       }
       return session
     },
