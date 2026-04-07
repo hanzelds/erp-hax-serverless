@@ -4,14 +4,20 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "ERP Hax", template: "%s | ERP Hax" },
-  description: "Sistema de gestión empresarial — HAX ESTUDIO CREATIVO EIRL",
+  title: "ERP Hax",
+  description: "ERP Hax Serverless",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="es" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="antialiased bg-gray-50 text-gray-900">{children}</body>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <body className="antialiased">
+        {children}
+      </body>
     </html>
   );
 }
