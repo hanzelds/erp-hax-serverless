@@ -1,0 +1,363 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole @default(ADMIN)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  accounts  Account[]
+  sessions  Session[]
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+enum UserRole {
+  ADMIN
+  CONTADOR
+  VENDEDOR
+}
+
+model BusinessUnit {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  active         Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  invoices       Invoice[]
+  expenses       Expense[]
+  journalEntries JournalEntry[]
+  @@map("business_units")
+}
+
+model Contact {
+  id           String      @id @default(cuid())
+  type         ContactType @default(CLIENT)
+  name         String
+  businessName String?
+  rnc          String?
+  cedula       String?
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  notes        String?
+  active       Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  invoices     Invoice[]
+  expenses     Expense[]
+  salesLeads   SalesLead[]
+  @@map("contacts")
+}
+
+enum ContactType {
+  CLIENT
+  SUPPLIER
+  BOTH
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  code         String?       @unique
+  name         String
+  description  String?
+  type         ProductType   @default(SERVICE)
+  price        Decimal       @db.Decimal(18, 2)
+  taxRate      Decimal       @default(0.18) @db.Decimal(5, 4)
+  taxExempt    Boolean       @default(false)
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  invoiceItems InvoiceItem[]
+  @@map("products")
+}
+
+enum ProductType {
+  SERVICE
+  PRODUCT
+}
+
+model SalesLead {
+  id           String    @id @default(cuid())
+  contactId    String?
+  name         String
+  value        Decimal?  @db.Decimal(18, 2)
+  stage        LeadStage @default(LEAD)
+  notes        String?
+  expectedDate DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  contact      Contact?  @relation(fields: [contactId], references: [id])
+  @@map("sales_leads")
+}
+
+enum LeadStage {
+  LEAD
+  CONTACT
+  PROPOSAL
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+model Invoice {
+  id               String        @id @default(cuid())
+  number           String?       @unique
+  contactId        String
+  businessUnitId   String
+  status           InvoiceStatus @default(DRAFT)
+  type             NCFType       @default(CREDIT_FISCAL)
+  ncf              String?
+  alanubeTxId      String?
+  alanubeStatus    String?
+  alanubeResponse  Json?
+  alanubeXml       String?       @db.Text
+  submittedAt      DateTime?
+  approvedAt       DateTime?
+  issueDate        DateTime      @default(now())
+  dueDate          DateTime?
+  subtotal         Decimal       @db.Decimal(18, 2)
+  taxAmount        Decimal       @default(0) @db.Decimal(18, 2)
+  total            Decimal       @db.Decimal(18, 2)
+  amountPaid       Decimal       @default(0) @db.Decimal(18, 2)
+  notes            String?
+  isRecurring      Boolean       @default(false)
+  recurringDay     Int?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  contact          Contact       @relation(fields: [contactId], references: [id])
+  businessUnit     BusinessUnit  @relation(fields: [businessUnitId], references: [id])
+  items            InvoiceItem[]
+  payments         Payment[]
+  creditNotes      CreditNote[]
+  journalEntries   JournalEntry[]
+  alanubeLog       AlanubeLog[]
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  CANCELLED
+  PENDING
+  PARTIAL
+  PAID
+}
+
+enum NCFType {
+  CREDIT_FISCAL
+  CONSUMO
+  CREDIT_NOTE
+  SPECIAL
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  productId   String?
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(18, 2)
+  taxRate     Decimal @default(0.18) @db.Decimal(5, 4)
+  taxExempt   Boolean @default(false)
+  taxAmount   Decimal @db.Decimal(18, 2)
+  total       Decimal @db.Decimal(18, 2)
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+  @@map("invoice_items")
+}
+
+model CreditNote {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  ncf             String?
+  alanubeTxId     String?
+  alanubeResponse Json?
+  status          InvoiceStatus @default(DRAFT)
+  reason          String
+  amount          Decimal       @db.Decimal(18, 2)
+  taxAmount       Decimal       @default(0) @db.Decimal(18, 2)
+  total           Decimal       @db.Decimal(18, 2)
+  issueDate       DateTime      @default(now())
+  approvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id])
+  @@map("credit_notes")
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  invoiceId         String
+  amount            Decimal         @db.Decimal(18, 2)
+  method            PaymentMethod
+  reference         String?
+  notes             String?
+  paymentDate       DateTime        @default(now())
+  createdAt         DateTime        @default(now())
+  bankTransactionId String?
+  invoice           Invoice         @relation(fields: [invoiceId], references: [id])
+  bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id])
+  journalEntries    JournalEntry[]
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  TRANSFER
+  CASH
+  CHECK
+}
+
+model Expense {
+  id                String          @id @default(cuid())
+  supplierId        String?
+  businessUnitId    String
+  category          ExpenseCategory
+  description       String
+  amount            Decimal         @db.Decimal(18, 2)
+  taxAmount         Decimal         @default(0) @db.Decimal(18, 2)
+  total             Decimal         @db.Decimal(18, 2)
+  taxExempt         Boolean         @default(false)
+  expenseDate       DateTime        @default(now())
+  reference         String?
+  notes             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  bankTransactionId String?
+  supplier          Contact?        @relation(fields: [supplierId], references: [id])
+  businessUnit      BusinessUnit    @relation(fields: [businessUnitId], references: [id])
+  bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id])
+  journalEntries    JournalEntry[]
+  @@map("expenses")
+}
+
+enum ExpenseCategory {
+  OPERATIVO
+  MARKETING
+  NOMINA
+  ALQUILER
+  SERVICIOS
+  TECNOLOGIA
+  VIAJES
+  OTROS
+}
+
+model ChartAccount {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  name           String
+  type           AccountType
+  parentId       String?
+  active         Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  parent         ChartAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children       ChartAccount[] @relation("AccountHierarchy")
+  journalEntries JournalEntry[]
+  @@map("chart_accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model JournalEntry {
+  id             String       @id @default(cuid())
+  accountId      String
+  businessUnitId String
+  invoiceId      String?
+  paymentId      String?
+  expenseId      String?
+  description    String
+  debit          Decimal      @default(0) @db.Decimal(18, 2)
+  credit         Decimal      @default(0) @db.Decimal(18, 2)
+  entryDate      DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  account        ChartAccount @relation(fields: [accountId], references: [id])
+  businessUnit   BusinessUnit @relation(fields: [businessUnitId], references: [id])
+  invoice        Invoice?     @relation(fields: [invoiceId], references: [id])
+  payment        Payment?     @relation(fields: [paymentId], references: [id])
+  expense        Expense?     @relation(fields: [expenseId], references: [id])
+  @@map("journal_entries")
+}
+
+model BankTransaction {
+  id          String              @id @default(cuid())
+  description String
+  amount      Decimal             @db.Decimal(18, 2)
+  txDate      DateTime
+  type        BankTransactionType
+  reference   String?
+  matched     Boolean             @default(false)
+  uploadedAt  DateTime            @default(now())
+  payments    Payment[]
+  expenses    Expense[]
+  @@map("bank_transactions")
+}
+
+enum BankTransactionType {
+  CREDIT
+  DEBIT
+}
+
+model AlanubeLog {
+  id        String   @id @default(cuid())
+  invoiceId String
+  action    String
+  request   Json?
+  response  Json?
+  status    String
+  createdAt DateTime @default(now())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  @@map("alanube_logs")
+}
